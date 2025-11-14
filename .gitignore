@@ -1,6 +1,59 @@
-.git
-.vscode
-*.venv
-requirements.txt
-*.ipynb
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+dbms.venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
 .env
+.env.local
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Data files (keep structure, ignore content)
+Celebrity Faces Dataset/**/*.jpg
+Celebrity Faces Dataset/**/*.jpeg
+Celebrity Faces Dataset/**/*.png
+*.csv
+!schema.sql
+
+# Jupyter Notebooks (development only)
+*.ipynb
+
+# Temporary files
+temp_*.jpg
+temp_*.png
+
+# Student photos (keep directory, ignore content)
+student_photos/*
+!student_photos/.gitkeep

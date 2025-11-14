@@ -1,4 +1,5 @@
 version: '3.8'
+# Note: version is deprecated in newer Docker Compose, but kept for compatibility
 
 services:
   mysql:
@@ -8,18 +9,26 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
     ports:
-      - "3306:3306"
+      - "3307:3306"  # Changed to 3307 to avoid conflict with local MySQL
     volumes:
       - mysql_data:/var/lib/mysql
       - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
     networks:
       - attendance_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
 
   api:
     build: .
     container_name: attendance_api
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     environment:
       DB_HOST: mysql
       DB_USER: ${DB_USER}
@@ -28,18 +37,23 @@ services:
       SENDER_EMAIL: ${SENDER_EMAIL}
       SENDER_PASSWORD: ${SENDER_PASSWORD}
     ports:
-      - "5000:5000"
+      - "5001:5000"
     volumes:
-      - ./student_photos:/app/student_photos
+      - ./student_photos:/app/backend/student_photos
+      - ./logs:/app/backend/logs
+      - ./frontend:/app/frontend  # Mount frontend for live updates
     networks:
       - attendance_network
+    restart: unless-stopped
 
   scheduler:
     build: .
     container_name: attendance_scheduler
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     command: python scheduler.py
+    working_dir: /app/backend
     environment:
       DB_HOST: mysql
       DB_USER: ${DB_USER}
@@ -51,6 +65,7 @@ services:
       AUTO_NOTIFY_SCHEDULE: "18:00"
     networks:
       - attendance_network
+    restart: unless-stopped
 
 volumes:
   mysql_data:

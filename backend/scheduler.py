@@ -4,6 +4,7 @@ from datetime import datetime
 from Notification import NotificationSystem
 from config import Config
 import logging
+from database import DatabaseManager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -16,6 +17,7 @@ logging.basicConfig(
 
 class AttendanceScheduler:
     def __init__(self):
+        self.db = DatabaseManager()
         self.notification_system = NotificationSystem()
         logging.info("Scheduler initialized")
     
@@ -69,7 +71,16 @@ class AttendanceScheduler:
         """Get all active subjects"""
         db = DatabaseManager()
         query = "SELECT Subject_ID, Subject_Name, User_ID FROM Subject WHERE Is_Active = TRUE"
-        return db.execute_query(query, fetch=True)
+        try:
+            result = db.execute_query(query, fetch=True)
+            # Ensure we always return an iterable (empty list if no results)
+            if not result:
+                logging.info("No active subjects found in database")
+                return []
+            return result
+        except Exception as e:
+            logging.error(f"Failed to fetch subjects: {e}")
+            return []
     
     def weekly_summary(self):
         """Generate and send weekly summary reports"""
@@ -77,6 +88,10 @@ class AttendanceScheduler:
         
         try:
             subjects = self.get_all_subjects()
+            
+            if not subjects:
+                logging.warning("No subjects found for weekly summary")
+                return
             
             for subject in subjects:
                 faculty_id = subject.get('User_ID')
