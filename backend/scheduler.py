@@ -4,6 +4,7 @@ from datetime import datetime
 from Notification import NotificationSystem
 from config import Config
 import logging
+from database import DatabaseManager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -16,8 +17,23 @@ logging.basicConfig(
 
 class AttendanceScheduler:
     def __init__(self):
+        self.db = DatabaseManager()
         self.notification_system = NotificationSystem()
         logging.info("Scheduler initialized")
+    
+    def auto_close_sessions(self):
+        """Mark sessions as Completed once their end time has passed."""
+        try:
+            query = """
+                UPDATE Attendance_Session
+                SET Status = 'Completed'
+                WHERE Status IN ('Scheduled', 'Ongoing')
+                  AND TIMESTAMP(Session_Date, End_Time) < NOW()
+            """
+            self.db.execute_query(query)
+            logging.info("Auto-close check executed")
+        except Exception as e:
+            logging.error(f"Failed to auto-close sessions: {e}")
     
     def daily_attendance_check(self):
         """Run daily attendance check and send notifications"""
@@ -69,7 +85,16 @@ class AttendanceScheduler:
         """Get all active subjects"""
         db = DatabaseManager()
         query = "SELECT Subject_ID, Subject_Name, User_ID FROM Subject WHERE Is_Active = TRUE"
-        return db.execute_query(query, fetch=True)
+        try:
+            result = db.execute_query(query, fetch=True)
+            # Ensure we always return an iterable (empty list if no results)
+            if not result:
+                logging.info("No active subjects found in database")
+                return []
+            return result
+        except Exception as e:
+            logging.error(f"Failed to fetch subjects: {e}")
+            return []
     
     def weekly_summary(self):
         """Generate and send weekly summary reports"""
@@ -77,6 +102,10 @@ class AttendanceScheduler:
         
         try:
             subjects = self.get_all_subjects()
+            
+            if not subjects:
+                logging.warning("No subjects found for weekly summary")
+                return
             
             for subject in subjects:
                 faculty_id = subject.get('User_ID')
@@ -90,6 +119,10 @@ class AttendanceScheduler:
     def start(self):
         """Start the scheduler"""
         logging.info("Starting Attendance Automation Scheduler")
+        
+        # Auto close sessions every minute
+        schedule.every(1).minutes.do(self.auto_close_sessions)
+        logging.info("Scheduled auto-close job to run every minute")
         
         if Config.AUTO_NOTIFY_ENABLED:
             # Daily notification at specified time

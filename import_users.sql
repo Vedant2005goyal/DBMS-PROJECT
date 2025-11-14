@@ -1,0 +1,34 @@
+-- Import users from CSV data
+-- Note: Adjust User_ID if AUTO_INCREMENT conflicts
+
+INSERT INTO User (User_ID, Name, Email, Password_Hash, Contact_No, User_Role) VALUES
+(1, 'Angelina Jolie', 'ajolie@thapar.edu', 'passAJo1!@', '9876543210', 'Student'),
+(2, 'Brad Pitt', 'bpitt@thapar.edu', 'passBPi2#$', '9876543211', 'Student'),
+(3, 'Denzel Washington', 'dwashington@thapar.edu', 'passDWa3%^', '9876543212', 'Faculty'),
+(4, 'Hugh Jackman', 'hjackman@thapar.edu', 'passHJa4&*', '9876543213', 'Student'),
+(5, 'Jennifer Lawrence', 'jlawrence@thapar.edu', 'passJLa5()', '9876543214', 'Student'),
+(6, 'Johnny Depp', 'jdepp@thapar.edu', 'passJDe6!#', '9876543215', 'Student'),
+(7, 'Kate Winslet', 'kwinslet@thapar.edu', 'passKWi7@$', '9876543216', 'Faculty'),
+(8, 'Leonardo DiCaprio', 'ldicaprio@thapar.edu', 'passLDi8%^', '9876543217', 'Student'),
+(9, 'Megan Fox', 'mfox@thapar.edu', 'passMFo9&*', '9876543218', 'Student'),
+(10, 'Natalie Portman', 'nportman@thapar.edu', 'passNPo1()', '9876543219', 'Student'),
+(11, 'Nicole Kidman', 'nkidman@thapar.edu', 'passNKi2!@', '9876543220', 'Student'),
+(12, 'Robert Downey Jr', 'rdowney@thapar.edu', 'passRDo3#$', '9876543221', 'Student'),
+(13, 'Sandra Bullock', 'sbullock@thapar.edu', 'passSBu4%^', '9876543222', 'Student'),
+(14, 'Scarlett Johansson', 'sjohansson@thapar.edu', 'passSJo5&*', '9876543223', 'Student'),
+(15, 'Tom Cruise', 'tcruise@thapar.edu', 'passTCr6()', '9876543224', 'Student'),
+(16, 'Tom Hanks', 'thanks@thapar.edu', 'passTHa7!#', '9876543225', 'Faculty'),
+(17, 'Will Smith', 'wsmith@thapar.edu', 'passWSi8@$', '9876543226', 'Student'),
+(18, 'Osho', 'rajneeshpuram@thapar.edu', 'jpafjTE@', '9876535871', 'Faculty'),
+(19, 'Khalil Gibran', 'prophet@thapar.edu', 'passfjTE@', '9682535871', 'Faculty'),
+(20, 'Aditya Gupta', 'aditya@thapar.edu', 'a7c2f1201', '9352196565', 'Student'),
+(21, 'Vedant Goyal', 'vgoyal@thapar.edu', 'uf422ets@', '8571027278', 'Student'),
+(22, 'Rushil Upadhyay', 'rupadh@thapar.edu', 'Asdfgh@20', '1234567890', 'Student'),
+(23, 'Nikunj Garg', 'nikunj@thapar.edu', 'bhhb0611#', '9644863454', 'Student'),
+(24, 'Kusham Lata', 'kusham@thapar.edu', 'kl@7353er', '8899248891', 'Student')
+ON DUPLICATE KEY UPDATE 
+    Name = VALUES(Name),
+    Password_Hash = VALUES(Password_Hash),
+    Contact_No = VALUES(Contact_No),
+    User_Role = VALUES(User_Role);
+

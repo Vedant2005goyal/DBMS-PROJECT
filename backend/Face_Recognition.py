@@ -7,12 +7,22 @@
 import os 
 import json
 import mysql.connector
-from typing import List,Optional,Tuple,Dict
-import face_recognition
+from typing import List, Optional, Tuple, Dict, Any, cast
+try:
+    import face_recognition
+    FACE_RECOGNITION_AVAILABLE = True
+except ImportError:
+    FACE_RECOGNITION_AVAILABLE = False
+    print("Warning: face_recognition not available in Face_Recognition.py")
 import numpy as np
 from numpy.typing import NDArray
 import cv2 as cv
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+    print("Warning: matplotlib not available")
 
 
 # In[3]:
@@ -21,11 +31,13 @@ import matplotlib.pyplot as plt
 class FaceRegistration:
     def __init__(self):
         try:
+            from config import Config
             self.mysql_connection=mysql.connector.connect(
-                host="localhost",
-                user="root",
-                password="goyalvedant2005",
-                database="attendance_system"
+                host=Config.DB_HOST,
+                user=Config.DB_USER,
+                password=Config.DB_PASSWORD,
+                database=Config.DB_NAME,
+                port=Config.DB_PORT
             )
             self.cursor=self.mysql_connection.cursor(dictionary=True)
             print('Database connected succesfully!!')
@@ -35,15 +47,17 @@ class FaceRegistration:
             raise
 
     def extract_embeddings(self,image_path:str):
+        if not FACE_RECOGNITION_AVAILABLE:
+            return None, None
         image=face_recognition.load_image_file(image_path)
-        face_locations:List[int] = face_recognition.face_locations(image) 
+        face_locations = face_recognition.face_locations(image) 
         if len(face_locations) == 0:
             print("No face detected in the image!")
             return None, None    
         if len(face_locations) > 1:
                 print(f"{len(face_locations)} faces detected. Using the largest face.")
                 face_locations = [max(face_locations, key=lambda loc: (loc[2]-loc[0])*(loc[1]-loc[3]))]
-        face_encodings = face_recognition.face_encodings(image, face_locations)    
+        face_encodings = face_recognition.face_encodings(image, face_locations) if FACE_RECOGNITION_AVAILABLE else []    
         if len(face_encodings) > 0:
             print(f"Embeddings extracted successfully")
             return face_encodings[0], face_locations[0]
@@ -51,19 +65,23 @@ class FaceRegistration:
             print("Could not generate embeddings")
             return None, None
 
-    def face_with_bbox(self,image_path:str,face_locations:List[int]):
+    def face_with_bbox(self,image_path:str,face_locations:List[Tuple[int,int,int,int]]):
         image=cv.imread(image_path)
+        if image is None:
+            print("Could not read image")
+            return
+        img_rgb = cv.cvtColor(image, cv.COLOR_BGR2RGB)
         for (top, right, bottom, left) in face_locations:
             print(f"Top: {top}, Right: {right}, Bottom: {bottom}, Left: {left}")
-        img_rgb = cv.cvtColor(image, cv.COLOR_BGR2RGB)
-        cv.rectangle(img_rgb, (left, top), (right, bottom), (0, 255, 0), 3)
+            img_rgb = cv.cvtColor(image, cv.COLOR_BGR2RGB)
+            cv.rectangle(img_rgb, (left, top), (right, bottom), (0, 255, 0), 3)
         plt.imshow(img_rgb)
         plt.show()
 
     def get_info(self,User_ID):
         query="SELECT u.User_ID,u.Name,u.Email FROM User u WHERE u.User_ID = %s"
         self.cursor.execute(query, (User_ID,))
-        student:Tuple[str] = self.cursor.fetchone()
+        student: Optional[Dict[str, Any]] = self.cursor.fetchone() # type: ignore
         if student:
             print(f"User Found: {student['Name']}")
             return student
@@ -74,16 +92,17 @@ class FaceRegistration:
     def check_existing_embeddings(self,User_ID):
         query="SELECT f.Face_ID,f.Photo_Path from Face_Embeddings f WHERE f.User_ID=%s LIMIT 1"
         self.cursor.execute(query, (User_ID,))
-        result = self.cursor.fetchone()    
+        # cast the fetched row to an optional dict for proper typing
+        result = cast(Optional[Dict[str, Any]], self.cursor.fetchone())
         if result:
             print(f"Face embedding already exists for User_ID: {User_ID}")
-            print(f"Face_ID: {result[0]}, Photo: {result[1]}")
+            print(f"Face_ID: {result['Face_ID']}, Photo: {result['Photo_Path']}")
             return result
         return None
 
 
     def insert_data_database(self,User_ID,face_encodings:list[NDArray],Photo_Path:str):
-        embeddings=face_encodings.tolist()
+        embeddings=face_encodings.tolist() # type: ignore
         embeddings_json=json.dumps(embeddings)
         sql="INSERT INTO Face_Embeddings (User_ID, Face_Encoding, Photo_Path) VALUES (%s, %s, %s)"
         self.cursor.execute(sql,(User_ID, embeddings_json, Photo_Path))
@@ -91,30 +110,32 @@ class FaceRegistration:
         face_id=self.cursor.lastrowid
         return face_id
 
-    def register_person(self,User_ID,image_path,show_preview=False)->bool:
+    def register_person(self,User_ID,image_path,show_preview=False):
         if not os.path.exists(image_path):
-            return False
+            return False, "Image path does not exist."
         user = self.get_info(User_ID)
         if not user:
-            return False
+            return False, f"User ID {User_ID} not found in database."
         existing = self.check_existing_embeddings(User_ID)
         if existing:
-            print(f'{User_ID} already exists!')
-            return False
+            message = f"User ID {User_ID} ({user.get('Name', '')}) already has a face registered."
+            print(message)
+            return False, message
         face_encoding, face_location = self.extract_embeddings(image_path)
         if face_encoding is None:
-            return False
+            return False, "No face detected in the provided image."
         if show_preview:
-            self.face_with_bbox(image_path, [face_location])
-        self.insert_data_database(User_ID,face_encoding,image_path)
-        print(f"{User_ID} added to the database")
-        return True
+            self.face_with_bbox(image_path, [face_location]) # type: ignore
+        self.insert_data_database(User_ID,face_encoding,image_path) # type: ignore
+        message= f"{User_ID} added to the database"
+        print(message)
+        return True,message
 
     def delete_face(self,User_ID)->None:
         existing=self.check_existing_embeddings(User_ID)
         if existing:
             x=input("Are you sure you want to delete it from the database: Yes Y,No N")
-            if(x=="Y"|x=="y"):
+            if(x=="Y"|x=="y"): # type: ignore
                 sql = "DELETE FROM Face_Embeddings WHERE User_ID = %s"
                 self.cursor.execute(sql, (User_ID,))
                 self.mysql_connection.commit()

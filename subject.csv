@@ -1,0 +1,20 @@
+"Subject_ID","Subject_Name","Subject_Code","User_ID","Class_ID","Credits","Semester"
+1001,"Introduction to Programming","UCS101",3,101,4,1
+1002,"Basic Electrical Engineering","UES101",7,101,3,1
+1003,"Physics","UPH101",16,101,3,2
+1005,"Data Structures","UCS310",3,103,4,3
+1007,"Operating Systems","UCS410",3,103,4,4
+1008,"Computer Architecture","UCS411",7,103,3,4
+1009,"Database Management Systems","UCS510",16,105,3,5
+1010,"Software Engineering","UCS511",3,105,3,5
+1011,"Computer Networks","UCS610",16,105,4,6
+1013,"Machine Learning","UCS710",7,107,3,7
+1014,"Capstone","UCS799",16,107,4,7
+1016,"Basic Electronics","UEC101",7,111,4,1
+1018,"Analog Electronics","UEC310",7,113,3,3
+1020,"Communication Systems","UEC510",7,114,3,5
+1022,"Engineering Drawing","UME101",16,121,2,1
+1024,"Thermodynamics","UME310",16,123,4,3
+1026,"Fluid Mechanics","UME510",16,124,3,5
+1027,"Heat Transfer","UME610",16,124,4,6
+1028,"Surveying","UCE310",3,132,3,3

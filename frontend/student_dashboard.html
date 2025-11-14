@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="navbar">
+        <div>
+            <h2>🎓 Student Dashboard</h2>
+            <p id="studentName"></p>
+        </div>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+
+    <div class="container">
+        <!-- Stats Cards -->
+        <div class="stats">
+            <div class="stat-box">
+                <h3 id="overallPercentage">--%</h3>
+                <p>Overall Attendance</p>
+            </div>
+            <div class="stat-box">
+                <h3 id="presentCount">--</h3>
+                <p>Classes Attended</p>
+            </div>
+            <div class="stat-box">
+                <h3 id="absentCount">--</h3>
+                <p>Classes Missed</p>
+            </div>
+        </div>
+
+        <!-- Subject-wise Attendance -->
+        <div class="card">
+            <h3>📚 Attendance by Subject</h3>
+            <div id="subjectBreakdown">
+                <p style="text-align: center; color: #999;">Loading...</p>
+            </div>
+        </div>
+
+        <!-- Attendance Table -->
+        <div class="card">
+            <h3>Recent Attendance</h3>
+            <table id="attendanceTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Subject</th>
+                        <th>Status</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody id="attendanceBody">
+                    <tr>
+                        <td colspan="4" style="text-align: center;">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Auto-detect API URL based on current location
+        const getAPIUrl = () => {
+            const hostname = window.location.hostname;
+            const protocol = window.location.protocol;
+            
+            // If accessing via ngrok, cloudflare, or other tunnel
+            if (hostname.includes('ngrok') || 
+                hostname.includes('cloudflare') || 
+                hostname.includes('trycloudflare') ||
+                hostname.includes('loca.lt') ||
+                hostname !== 'localhost' && hostname !== '127.0.0.1') {
+                // Use the same origin (ngrok/tunnel URL)
+                return `${protocol}//${hostname}`;
+            }
+            
+            // Default to localhost
+            return 'http://localhost:5001';
+        };
+        
+        const API_URL = getAPIUrl();
+        console.log('🌐 API URL:', API_URL);
+        
+        // Check if logged in
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.role !== 'Student') {
+            window.location.href = 'index.html';
+        }
+        
+        document.getElementById('studentName').textContent = user.name;
+        
+        // Load attendance data
+        async function loadAttendance() {
+            try {
+                const response = await fetch(`${API_URL}/api/attendance/student/${user.user_id}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update overall stats
+                    document.getElementById('overallPercentage').textContent = 
+                        data.stats.percentage.toFixed(1) + '%';
+                    document.getElementById('presentCount').textContent = 
+                        data.stats.present_sessions;
+                    document.getElementById('absentCount').textContent = 
+                        data.stats.absent_sessions;
+                    
+                    // Update subject breakdown
+                    const breakdownDiv = document.getElementById('subjectBreakdown');
+                    if (data.subject_breakdown && data.subject_breakdown.length > 0) {
+                        breakdownDiv.innerHTML = `
+                            <table style="width: 100%; margin-top: 15px;">
+                                <thead>
+                                    <tr>
+                                        <th>Subject</th>
+                                        <th>Attended</th>
+                                        <th>Total</th>
+                                        <th>Percentage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.subject_breakdown.map(subject => `
+                                        <tr>
+                                            <td><strong>${subject.subject_name}</strong><br><small>${subject.subject_code}</small></td>
+                                            <td>${subject.present_sessions}</td>
+                                            <td>${subject.total_sessions}</td>
+                                            <td>
+                                                <span style="color: ${subject.percentage >= 75 ? 'green' : subject.percentage >= 50 ? 'orange' : 'red'}; font-weight: bold;">
+                                                    ${subject.percentage.toFixed(1)}%
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    } else {
+                        breakdownDiv.innerHTML = '<p style="text-align: center; color: #999;">No subject attendance data available</p>';
+                    }
+                    
+                    // Update table
+                    const tbody = document.getElementById('attendanceBody');
+                    tbody.innerHTML = '';
+                    
+                    if (data.attendance.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 30px; color: #999;">No attendance records yet.</td></tr>';
+                        return;
+                    }
+                    
+                    data.attendance.forEach(record => {
+                        const row = tbody.insertRow();
+                        const statusClass = record.status === 'Present' ? 'present' : 
+                                          record.status === 'Late' ? 'late' : 'absent';
+                        row.innerHTML = `
+                            <td>${new Date(record.date).toLocaleDateString()}</td>
+                            <td>${record.subject_name}${record.subject_code ? ` (${record.subject_code})` : ''}</td>
+                            <td class="${statusClass}">${record.status}</td>
+                            <td>${record.time ? new Date(record.time).toLocaleTimeString() : 'N/A'}</td>
+                        `;
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading attendance:', error);
+                document.getElementById('attendanceBody').innerHTML = 
+                    '<tr><td colspan="4" style="text-align: center; color: red;">Error loading data</td></tr>';
+            }
+        }
+        
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'index.html';
+        }
+        
+        // Load data on page load
+        loadAttendance();
+    </script>
+</body>
+</html>
