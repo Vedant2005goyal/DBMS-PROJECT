@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="navbar">
+        <div>
+            <h2>🎓 Student Dashboard</h2>
+            <p id="studentName"></p>
+        </div>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+
+    <div class="container">
+        <!-- Stats Cards -->
+        <div class="stats">
+            <div class="stat-box">
+                <h3 id="overallPercentage">--%</h3>
+                <p>Overall Attendance</p>
+            </div>
+            <div class="stat-box">
+                <h3 id="presentCount">--</h3>
+                <p>Classes Attended</p>
+            </div>
+            <div class="stat-box">
+                <h3 id="absentCount">--</h3>
+                <p>Classes Missed</p>
+            </div>
+        </div>
+
+        <!-- Info Message -->
+        <div class="card">
+            <h3>📚 Your Attendance</h3>
+            <p style="color: #666; margin-top: 10px;">
+                Your attendance is automatically marked by your teachers during class sessions. 
+                View your attendance history and statistics below.
+            </p>
+        </div>
+
+        <!-- Attendance Table -->
+        <div class="card">
+            <h3>Recent Attendance</h3>
+            <table id="attendanceTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Subject</th>
+                        <th>Status</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody id="attendanceBody">
+                    <tr>
+                        <td colspan="4" style="text-align: center;">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5001';
+        
+        // Check if logged in
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.role !== 'Student') {
+            window.location.href = 'index.html';
+        }
+        
+        document.getElementById('studentName').textContent = user.name;
+        
+        // Load attendance data
+        async function loadAttendance() {
+            try {
+                const response = await fetch(`${API_URL}/api/attendance/student/${user.user_id}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update stats
+                    document.getElementById('overallPercentage').textContent = 
+                        data.stats.percentage + '%';
+                    document.getElementById('presentCount').textContent = 
+                        data.stats.present_sessions;
+                    document.getElementById('absentCount').textContent = 
+                        data.stats.absent_sessions;
+                    
+                    // Update table
+                    const tbody = document.getElementById('attendanceBody');
+                    tbody.innerHTML = '';
+                    
+                    if (data.attendance.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 30px; color: #999;">No attendance records yet. Mark your first attendance to get started!</td></tr>';
+                        return;
+                    }
+                    
+                    data.attendance.forEach(record => {
+                        const row = tbody.insertRow();
+                        const statusClass = record.status === 'Present' ? 'present' : 
+                                          record.status === 'Late' ? 'late' : 'absent';
+                        row.innerHTML = `
+                            <td>${record.date}</td>
+                            <td>${record.subject_name}</td>
+                            <td class="${statusClass}">${record.status}</td>
+                            <td>${record.time}</td>
+                        `;
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading attendance:', error);
+                document.getElementById('attendanceBody').innerHTML = 
+                    '<tr><td colspan="4" style="text-align: center; color: red;">Error loading data</td></tr>';
+            }
+        }
+        
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'index.html';
+        }
+        
+        // Load data on page load
+        loadAttendance();
+    </script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mark Attendance</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="attendance-page-body">
+    <div class="navbar">
+        <div>
+            <h2>📷 Mark Attendance</h2>
+        </div>
+        <button class="logout-btn" onclick="goBack()">← Back to Dashboard</button>
+    </div>
+
+    <div class="container" style="max-width: 900px;">
+        <div class="card" id="container">
+            <h2 style="text-align: center; margin-bottom: 30px; color: #333;">Face Recognition Attendance</h2>
+            
+            <!-- Subject Selection -->
+            <div class="form-group" style="margin-bottom: 25px;">
+                <label for="subjectSelect" style="font-size: 16px; font-weight: 600; margin-bottom: 10px; display: block;">
+                    Select Subject:
+                </label>
+                <select id="subjectSelect" style="width: 100%; padding: 12px; border: 2px solid #667eea; border-radius: 8px; font-size: 16px; background: white;">
+                    <option value="">Loading subjects...</option>
+                </select>
+            </div>
+
+            <!-- Webcam Container -->
+            <div style="text-align: center; margin: 20px 0;">
+                <video id="webcam" width="640" height="480" autoplay muted style="border: 3px solid #667eea; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.2); max-width: 100%; height: auto;"></video>
+            </div>
+
+            <!-- Action Button -->
+            <button id="markButton" class="action-btn" style="width: 100%; padding: 18px; font-size: 18px; margin-top: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" 
+                    onmouseover="this.style.transform='scale(1.02)'; this.style.boxShadow='0 10px 25px rgba(102, 126, 234, 0.4)';"
+                    onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none';">
+                📸 Mark My Attendance
+            </button>
+            
+            <!-- Message Display -->
+            <div id="message" style="margin-top: 25px; padding: 15px; border-radius: 8px; font-size: 16px; font-weight: bold; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center;"></div>
+            
+            <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = "http://localhost:5001"; 
+        
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const markButton = document.getElementById('markButton');
+        const messageDiv = document.getElementById('message');
+        const subjectSelect = document.getElementById('subjectSelect');
+
+        // Load subjects
+        async function loadSubjects() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/subjects`);
+                const data = await response.json();
+                
+                if (data.success && data.subjects.length > 0) {
+                    subjectSelect.innerHTML = '<option value="">Select a subject...</option>';
+                    data.subjects.forEach(subject => {
+                        const option = document.createElement('option');
+                        option.value = subject.Subject_ID;
+                        option.textContent = `${subject.Subject_Name} (${subject.Subject_Code})`;
+                        subjectSelect.appendChild(option);
+                    });
+                } else {
+                    subjectSelect.innerHTML = '<option value="">No subjects available</option>';
+                    showMessage('No subjects found. Please contact administrator.', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading subjects:', error);
+                subjectSelect.innerHTML = '<option value="">Error loading subjects</option>';
+                showMessage('Error loading subjects. Please refresh the page.', 'error');
+            }
+        }
+
+        // Show message helper
+        function showMessage(text, type = 'info') {
+            messageDiv.textContent = text;
+            messageDiv.style.display = 'flex';
+            
+            if (type === 'success') {
+                messageDiv.style.background = '#d4edda';
+                messageDiv.style.color = '#155724';
+                messageDiv.style.border = '2px solid #c3e6cb';
+            } else if (type === 'error') {
+                messageDiv.style.background = '#f8d7da';
+                messageDiv.style.color = '#721c24';
+                messageDiv.style.border = '2px solid #f5c6cb';
+            } else {
+                messageDiv.style.background = '#d1ecf1';
+                messageDiv.style.color = '#0c5460';
+                messageDiv.style.border = '2px solid #bee5eb';
+            }
+        }
+
+        // Start the webcam
+        async function startWebcam() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: 'user'
+                    } 
+                });
+                video.srcObject = stream;
+                showMessage('Camera ready. Please select a subject and click to mark attendance.', 'info');
+            } catch (err) {
+                console.error("Error accessing webcam: ", err);
+                showMessage("Error: Could not access webcam. Please check permissions.", 'error');
+                markButton.disabled = true;
+            }
+        }
+
+        // Mark attendance
+        markButton.addEventListener('click', async () => {
+            const subjectId = subjectSelect.value;
+            
+            if (!subjectId) {
+                showMessage('Please select a subject first.', 'error');
+                return;
+            }
+
+            showMessage('Processing... Please wait.', 'info');
+            markButton.disabled = true;
+
+            // Draw the current video frame onto the hidden canvas
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, 640, 480);
+            
+            // Get the image from the canvas as a Base64 string
+            const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/mark-attendance`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        image: imageBase64,
+                        subject_id: parseInt(subjectId)
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage(`✅ ${result.message}`, 'success');
+                    // Reset after 3 seconds
+                    setTimeout(() => {
+                        showMessage('Ready for next attendance marking.', 'info');
+                    }, 3000);
+                } else {
+                    showMessage(`❌ ${result.message || 'Failed to mark attendance'}`, 'error');
+                }
+
+            } catch (error) {
+                console.error("Error sending image:", error);
+                showMessage("Error connecting to server. Please try again.", 'error');
+            } finally {
+                markButton.disabled = false;
+            }
+        });
+
+        function goBack() {
+            window.location.href = 'student_dashboard.html';
+        }
+
+        // Initialize on page load
+        loadSubjects();
+        startWebcam();
+    </script>
+</body>
+</html>

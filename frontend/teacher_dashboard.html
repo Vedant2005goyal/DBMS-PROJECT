@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="navbar">
+        <div>
+            <h2>👨‍🏫 Teacher Dashboard</h2>
+            <p id="teacherName"></p>
+        </div>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+
+    <div class="container">
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('sessions')">📅 Manage Sessions</button>
+            <button class="tab-btn" onclick="showTab('attendance')">📊 View Attendance</button>
+            <button class="tab-btn" onclick="showTab('mark')">📷 Mark Attendance (Camera)</button>
+            <button class="tab-btn" onclick="showTab('manual')">✏️ Mark Attendance (Manual)</button>
+        </div>
+
+        <!-- Tab 1: Create Session -->
+        <div id="sessions-tab" class="tab-content active">
+            <div class="card">
+                <h3>Create New Attendance Session</h3>
+                <form id="sessionForm">
+                    <div class="form-group">
+                        <label for="sessionSubject">Subject:</label>
+                        <select id="sessionSubject" required>
+                            <option value="">Loading subjects...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="sessionDate">Session Date:</label>
+                        <input type="date" id="sessionDate" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="startTime">Start Time:</label>
+                            <input type="time" id="startTime" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="endTime">End Time:</label>
+                            <input type="time" id="endTime" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="sessionType">Session Type:</label>
+                        <select id="sessionType" required>
+                            <option value="Lecture">Lecture</option>
+                            <option value="Lab">Lab</option>
+                            <option value="Tutorial">Tutorial</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="action-btn">Create Session</button>
+                </form>
+                <div id="sessionMessage"></div>
+            </div>
+
+            <!-- Active Sessions -->
+            <div class="card">
+                <h3>Active Sessions Today</h3>
+                <div id="activeSessions">
+                    <p style="text-align: center; color: #999;">Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: View Attendance -->
+        <div id="attendance-tab" class="tab-content">
+            <div class="card">
+                <h3>View Class Attendance</h3>
+                <div class="form-group">
+                    <label for="attendanceSubject">Select Subject:</label>
+                    <select id="attendanceSubject">
+                        <option value="">Select a subject...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="attendanceSession">Select Session:</label>
+                    <select id="attendanceSession">
+                        <option value="">Select a session...</option>
+                    </select>
+                </div>
+                <button onclick="loadClassAttendance()" class="action-btn">Load Attendance</button>
+            </div>
+
+            <div class="card">
+                <h3>Class Attendance</h3>
+                <div id="classAttendanceTable">
+                    <p style="text-align: center; color: #999;">Select a subject and session to view attendance</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Mark Attendance -->
+        <div id="mark-tab" class="tab-content">
+            <div class="card">
+                <h3>Mark Attendance Using Camera</h3>
+                <div class="form-group">
+                    <label for="markSubject">Select Subject:</label>
+                    <select id="markSubject" required>
+                        <option value="">Select a subject...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="markSession">Select Active Session:</label>
+                    <select id="markSession" required>
+                        <option value="">Select a session...</option>
+                    </select>
+                </div>
+                
+                <div style="text-align: center; margin: 20px 0;">
+                    <video id="webcam" width="640" height="480" autoplay muted style="border: 3px solid #667eea; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.2); max-width: 100%; height: auto; display: none;"></video>
+                </div>
+
+                <button id="startCameraBtn" onclick="startCamera()" class="action-btn">📷 Start Camera</button>
+                <button id="markAttendanceBtn" onclick="markAttendance()" class="action-btn" style="display: none;">✅ Mark Attendance</button>
+                
+                <div id="markMessage" style="margin-top: 20px;"></div>
+                <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+            </div>
+        </div>
+
+        <!-- Tab 4: Manual Attendance -->
+        <div id="manual-tab" class="tab-content">
+            <div class="card">
+                <h3>Mark Attendance Manually</h3>
+                <p style="color: #666; margin-bottom: 20px;">
+                    Use this option when camera is not working. Select subject and session, then mark students as Present, Late, or Absent.
+                </p>
+                
+                <div class="form-group">
+                    <label for="manualSubject">Select Subject:</label>
+                    <select id="manualSubject" onchange="loadManualStudents()">
+                        <option value="">Select a subject...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="manualSession">Select Active Session:</label>
+                    <select id="manualSession" onchange="loadManualStudents()">
+                        <option value="">Select a session...</option>
+                    </select>
+                </div>
+
+                <div id="manualStudentsList" style="margin-top: 20px;">
+                    <p style="text-align: center; color: #999;">Select subject and session to load students</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5001';
+        
+        // Check if logged in
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.role !== 'Faculty') {
+            window.location.href = 'index.html';
+        }
+        
+        document.getElementById('teacherName').textContent = user.name;
+        
+        let videoStream = null;
+        let subjects = [];
+        let activeSessions = [];
+
+        // Load teacher's subjects
+        async function loadSubjects() {
+            try {
+                console.log('Loading subjects for teacher_id:', user.user_id);
+                const response = await fetch(`${API_URL}/api/teacher/subjects?teacher_id=${user.user_id}`);
+                const data = await response.json();
+                
+                console.log('Subjects response:', data);
+                
+                if (data.success && data.subjects && data.subjects.length > 0) {
+                    subjects = data.subjects;
+                    
+                    // Populate subject dropdowns
+                    const selects = ['sessionSubject', 'attendanceSubject', 'markSubject', 'manualSubject'];
+                    selects.forEach(selectId => {
+                        const select = document.getElementById(selectId);
+                        select.innerHTML = '<option value="">Select a subject...</option>';
+                        subjects.forEach(subject => {
+                            const option = document.createElement('option');
+                            option.value = subject.Subject_ID;
+                            option.textContent = `${subject.Subject_Name} (${subject.Subject_Code})`;
+                            select.appendChild(option);
+                        });
+                    });
+                } else {
+                    // Show error message
+                    const selects = ['sessionSubject', 'attendanceSubject', 'markSubject', 'manualSubject'];
+                    selects.forEach(selectId => {
+                        const select = document.getElementById(selectId);
+                        select.innerHTML = '<option value="">No subjects found for this teacher</option>';
+                    });
+                    console.warn('No subjects found for teacher:', data);
+                }
+            } catch (error) {
+                console.error('Error loading subjects:', error);
+                const selects = ['sessionSubject', 'attendanceSubject', 'markSubject'];
+                selects.forEach(selectId => {
+                    const select = document.getElementById(selectId);
+                    select.innerHTML = '<option value="">Error loading subjects</option>';
+                });
+            }
+        }
+
+        // Load active sessions
+        async function loadActiveSessions() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const response = await fetch(`${API_URL}/api/session/active?date=${today}`);
+                const data = await response.json();
+                
+                if (data.success && data.sessions) {
+                    activeSessions = data.sessions.filter(s => s.Created_By === user.user_id);
+                    displayActiveSessions();
+                    updateSessionDropdowns();
+                }
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+            }
+        }
+
+        function displayActiveSessions() {
+            const container = document.getElementById('activeSessions');
+            if (activeSessions.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #999;">No active sessions today</p>';
+                return;
+            }
+            
+            container.innerHTML = activeSessions.map(session => `
+                <div style="padding: 15px; margin: 10px 0; background: #f8f9fa; border-radius: 8px; border-left: 4px solid ${session.Status === 'Ongoing' ? '#28a745' : '#667eea'};">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div>
+                            <strong>${session.Subject_Name}</strong><br>
+                            <small>Date: ${session.Session_Date} | ${session.Start_Time} - ${session.End_Time}</small><br>
+                            <small>Type: ${session.Session_Type} | Status: <span style="color: ${session.Status === 'Ongoing' ? 'green' : '#666'}; font-weight: bold;">${session.Status}</span></small>
+                        </div>
+                        <div>
+                            ${session.Status === 'Scheduled' ? `
+                                <button onclick="startSession(${session.Session_ID})" class="action-btn" style="padding: 8px 15px; font-size: 14px; background: #28a745;">▶ Start Session</button>
+                            ` : session.Status === 'Ongoing' ? `
+                                <button onclick="endSession(${session.Session_ID})" class="action-btn" style="padding: 8px 15px; font-size: 14px; background: #dc3545;">⏹ End Session</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateSessionDropdowns() {
+            const markSession = document.getElementById('markSession');
+            const attendanceSession = document.getElementById('attendanceSession');
+            const manualSession = document.getElementById('manualSession');
+            
+            // Update mark session dropdown
+            markSession.innerHTML = '<option value="">Select a session...</option>';
+            activeSessions.forEach(session => {
+                const option = document.createElement('option');
+                option.value = session.Session_ID;
+                option.textContent = `${session.Subject_Name} - ${session.Start_Time}`;
+                markSession.appendChild(option);
+            });
+
+            // Update manual session dropdown
+            manualSession.innerHTML = '<option value="">Select a session...</option>';
+            activeSessions.forEach(session => {
+                const option = document.createElement('option');
+                option.value = session.Session_ID;
+                option.textContent = `${session.Subject_Name} - ${session.Start_Time}`;
+                manualSession.appendChild(option);
+            });
+
+            // Update attendance session dropdown (load all sessions for selected subject)
+            const subjectId = document.getElementById('attendanceSubject').value;
+            if (subjectId) {
+                loadSessionsForSubject(subjectId);
+            }
+        }
+
+        async function loadSessionsForSubject(subjectId) {
+            try {
+                const response = await fetch(`${API_URL}/api/session/subject/${subjectId}`);
+                const data = await response.json();
+                
+                if (data.success && data.sessions) {
+                    const select = document.getElementById('attendanceSession');
+                    select.innerHTML = '<option value="">Select a session...</option>';
+                    data.sessions.forEach(session => {
+                        const option = document.createElement('option');
+                        option.value = session.Session_ID;
+                        option.textContent = `${session.Session_Date} - ${session.Start_Time} (${session.Status})`;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+            }
+        }
+
+        // Create session
+        document.getElementById('sessionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const messageDiv = document.getElementById('sessionMessage');
+            
+            const sessionData = {
+                subject_id: parseInt(document.getElementById('sessionSubject').value),
+                session_date: document.getElementById('sessionDate').value,
+                start_time: document.getElementById('startTime').value,
+                end_time: document.getElementById('endTime').value,
+                session_type: document.getElementById('sessionType').value,
+                created_by: user.user_id
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/api/session/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(sessionData)
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showMessage(messageDiv, 'Session created successfully! Redirecting to mark attendance...', 'success');
+                    document.getElementById('sessionForm').reset();
+                    loadActiveSessions();
+                    
+                    // Auto-switch to mark attendance tab after 1 second
+                    setTimeout(() => {
+                        // Find the mark tab button and click it
+                        const markTabBtn = document.querySelector('.tab-btn:nth-child(3)');
+                        if (markTabBtn) {
+                            markTabBtn.click();
+                        }
+                    }, 1000);
+                } else {
+                    showMessage(messageDiv, data.message || 'Failed to create session', 'error');
+                }
+            } catch (error) {
+                showMessage(messageDiv, 'Error creating session', 'error');
+            }
+        });
+
+        // Load class attendance
+        async function loadClassAttendance() {
+            const sessionId = document.getElementById('attendanceSession').value;
+            if (!sessionId) {
+                alert('Please select a session');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/attendance/session/${sessionId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayClassAttendance(data.attendance);
+                }
+            } catch (error) {
+                console.error('Error loading attendance:', error);
+            }
+        }
+
+        function displayClassAttendance(attendance) {
+            const container = document.getElementById('classAttendanceTable');
+            
+            if (!attendance || attendance.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #999;">No attendance records for this session</p>';
+                return;
+            }
+
+            const table = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Roll No</th>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${attendance.map(record => `
+                            <tr>
+                                <td>${record.roll_no || 'N/A'}</td>
+                                <td>${record.name}</td>
+                                <td class="${record.status.toLowerCase()}">${record.status}</td>
+                                <td>${record.time || 'N/A'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            container.innerHTML = table;
+        }
+
+        // Camera functions
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 640, height: 480, facingMode: 'user' } 
+                });
+                videoStream = stream;
+                const video = document.getElementById('webcam');
+                video.srcObject = stream;
+                video.style.display = 'block';
+                document.getElementById('startCameraBtn').style.display = 'none';
+                document.getElementById('markAttendanceBtn').style.display = 'inline-block';
+                showMessage(document.getElementById('markMessage'), 'Camera ready. Position student in front of camera and click Mark Attendance.', 'info');
+            } catch (error) {
+                showMessage(document.getElementById('markMessage'), 'Error accessing camera. Please check permissions.', 'error');
+            }
+        }
+
+        // Auto-start camera when session is selected
+        function setupCameraAutoStart() {
+            const markSession = document.getElementById('markSession');
+            markSession.addEventListener('change', function() {
+                if (this.value && !videoStream) {
+                    // Auto-start camera when session is selected
+                    startCamera();
+                    // Auto-start the session
+                    startSession(parseInt(this.value));
+                }
+            });
+        }
+
+        // Start session (set status to Ongoing)
+        async function startSession(sessionId) {
+            try {
+                const response = await fetch(`${API_URL}/api/session/${sessionId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'Ongoing' })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    loadActiveSessions();
+                    // Auto-switch to mark attendance tab and start camera
+                    setTimeout(() => {
+                        const markTabBtn = document.querySelector('.tab-btn:nth-child(3)');
+                        if (markTabBtn) {
+                            markTabBtn.click();
+                            // Set the session in dropdown
+                            document.getElementById('markSession').value = sessionId;
+                            if (!videoStream) {
+                                startCamera();
+                            }
+                        }
+                    }, 500);
+                }
+            } catch (error) {
+                console.error('Error starting session:', error);
+            }
+        }
+
+        // End session (set status to Completed)
+        async function endSession(sessionId) {
+            if (!confirm('Are you sure you want to end this session?')) {
+                return;
+            }
+            try {
+                const response = await fetch(`${API_URL}/api/session/${sessionId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'Completed' })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    loadActiveSessions();
+                    // Stop camera if it's running
+                    if (videoStream) {
+                        videoStream.getTracks().forEach(track => track.stop());
+                        videoStream = null;
+                        document.getElementById('webcam').style.display = 'none';
+                        document.getElementById('startCameraBtn').style.display = 'inline-block';
+                        document.getElementById('markAttendanceBtn').style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                console.error('Error ending session:', error);
+            }
+        }
+
+        // Manual attendance functions
+        async function loadManualStudents() {
+            const subjectId = document.getElementById('manualSubject').value;
+            const sessionId = document.getElementById('manualSession').value;
+            
+            if (!subjectId || !sessionId) {
+                document.getElementById('manualStudentsList').innerHTML = 
+                    '<p style="text-align: center; color: #999;">Select subject and session to load students</p>';
+                return;
+            }
+
+            try {
+                // Load students for this subject
+                const studentsResponse = await fetch(`${API_URL}/api/subject/${subjectId}/students`);
+                const studentsData = await studentsResponse.json();
+                
+                // Load already marked attendance
+                const attendanceResponse = await fetch(`${API_URL}/api/attendance/session/${sessionId}`);
+                const attendanceData = await attendanceResponse.json();
+                
+                if (studentsData.success && studentsData.students) {
+                    const markedIds = new Set();
+                    if (attendanceData.success && attendanceData.attendance) {
+                        attendanceData.attendance.forEach(a => markedIds.add(a.User_ID));
+                    }
+                    
+                    const studentsList = studentsData.students.map(student => {
+                        const isMarked = markedIds.has(student.User_ID);
+                        const attendance = attendanceData.success ? 
+                            attendanceData.attendance.find(a => a.User_ID === student.User_ID) : null;
+                        
+                        return `
+                            <div style="padding: 15px; margin: 10px 0; background: ${isMarked ? '#d4edda' : '#f8f9fa'}; border-radius: 8px; border-left: 4px solid ${isMarked ? '#28a745' : '#667eea'}; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>${student.Name}</strong>
+                                    ${student.Roll_no ? `<br><small>Roll No: ${student.Roll_no}</small>` : ''}
+                                    ${attendance ? `<br><small style="color: ${attendance.Status === 'Present' ? 'green' : attendance.Status === 'Late' ? 'orange' : 'red'};">Status: ${attendance.Status}</small>` : ''}
+                                </div>
+                                <div>
+                                    ${!isMarked ? `
+                                        <div style="display: flex; gap: 10px;">
+                                            <button onclick="markManualAttendance(${student.User_ID}, 'Present')" class="action-btn" style="padding: 8px 15px; font-size: 14px; background: #28a745;">Present</button>
+                                            <button onclick="markManualAttendance(${student.User_ID}, 'Late')" class="action-btn" style="padding: 8px 15px; font-size: 14px; background: #ffc107; color: #000;">Late</button>
+                                            <button onclick="markManualAttendance(${student.User_ID}, 'Absent')" class="action-btn" style="padding: 8px 15px; font-size: 14px; background: #dc3545;">Absent</button>
+                                        </div>
+                                    ` : `
+                                        <span style="color: #28a745; font-weight: bold;">✓ Marked</span>
+                                    `}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    document.getElementById('manualStudentsList').innerHTML = studentsList;
+                } else {
+                    document.getElementById('manualStudentsList').innerHTML = 
+                        '<p style="text-align: center; color: #999;">No students found for this subject</p>';
+                }
+            } catch (error) {
+                console.error('Error loading students:', error);
+                document.getElementById('manualStudentsList').innerHTML = 
+                    '<p style="text-align: center; color: red;">Error loading students</p>';
+            }
+        }
+
+        async function markManualAttendance(userId, status) {
+            const subjectId = document.getElementById('manualSubject').value;
+            const sessionId = document.getElementById('manualSession').value;
+            
+            if (!subjectId || !sessionId) {
+                alert('Please select subject and session');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/attendance/manual`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        session_id: parseInt(sessionId),
+                        subject_id: parseInt(subjectId),
+                        status: status
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    alert(data.message);
+                    loadManualStudents(); // Refresh the list
+                } else {
+                    alert(data.message || 'Failed to mark attendance');
+                }
+            } catch (error) {
+                console.error('Error marking attendance:', error);
+                alert('Error marking attendance');
+            }
+        }
+
+        async function markAttendance() {
+            const subjectId = document.getElementById('markSubject').value;
+            const sessionId = document.getElementById('markSession').value;
+            
+            if (!subjectId || !sessionId) {
+                showMessage(document.getElementById('markMessage'), 'Please select subject and session', 'error');
+                return;
+            }
+
+            const video = document.getElementById('webcam');
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, 640, 480);
+            const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
+
+            showMessage(document.getElementById('markMessage'), 'Processing...', 'info');
+
+            try {
+                const response = await fetch(`${API_URL}/api/mark-attendance`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        image: imageBase64,
+                        subject_id: parseInt(subjectId),
+                        session_id: parseInt(sessionId)
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showMessage(document.getElementById('markMessage'), `✅ ${data.message}`, 'success');
+                } else {
+                    showMessage(document.getElementById('markMessage'), `❌ ${data.message}`, 'error');
+                }
+            } catch (error) {
+                showMessage(document.getElementById('markMessage'), 'Error marking attendance', 'error');
+            }
+        }
+
+        // Tab switching
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            event.target.classList.add('active');
+
+            if (tabName === 'attendance') {
+                const subjectId = document.getElementById('attendanceSubject').value;
+                if (subjectId) {
+                    loadSessionsForSubject(subjectId);
+                }
+            } else if (tabName === 'mark') {
+                // Auto-start camera if session is already selected
+                const sessionId = document.getElementById('markSession').value;
+                if (sessionId && !videoStream) {
+                    startCamera();
+                }
+            }
+        }
+
+        function showMessage(element, text, type) {
+            element.textContent = text;
+            element.style.display = 'block';
+            element.style.padding = '15px';
+            element.style.borderRadius = '8px';
+            element.style.marginTop = '15px';
+            
+            if (type === 'success') {
+                element.style.background = '#d4edda';
+                element.style.color = '#155724';
+            } else if (type === 'error') {
+                element.style.background = '#f8d7da';
+                element.style.color = '#721c24';
+            } else {
+                element.style.background = '#d1ecf1';
+                element.style.color = '#0c5460';
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'index.html';
+        }
+
+        // Set today's date as default
+        document.getElementById('sessionDate').valueAsDate = new Date();
+
+        // Event listeners
+        document.getElementById('attendanceSubject').addEventListener('change', function() {
+            if (this.value) {
+                loadSessionsForSubject(this.value);
+            }
+        });
+
+        // Initialize
+        loadSubjects();
+        loadActiveSessions();
+        setupCameraAutoStart();
+        
+        // Auto-refresh active sessions every 10 seconds
+        setInterval(() => {
+            loadActiveSessions();
+            // If on mark tab and session is selected, keep camera active
+            const markTab = document.getElementById('mark-tab');
+            if (markTab.classList.contains('active') && document.getElementById('markSession').value && !videoStream) {
+                startCamera();
+            }
+        }, 10000); // Refresh every 10 seconds
+    </script>
+</body>
+</html>
+

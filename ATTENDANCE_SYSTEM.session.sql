@@ -274,7 +274,7 @@ SELECT * FROM Face_Embeddings;
 SELECT * FROM Class;
 SELECT * from Faculty;
 SELECT * from Subject;
-SELECT * from Attendance;
+
 SELECT * from Students;
 SELECT * FROM Attendance_Session;
 TRUNCATE TABLE Attendance_Session;
@@ -282,10 +282,11 @@ SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE Attendance_Session;
 TRUNCATE TABLE Attendance;
 SET FOREIGN_KEY_CHECKS = 1;
-
+SELECT * FROM Subject;
 ALTER TABLE Attendance_Session 
 ADD CONSTRAINT unique_session 
 UNIQUE (Subject_ID, Session_Date, Start_Time);
 
 SELECT * FROM Attendance_Settings;
 >>>>>>> 5a3d8ce (sql code for the database part of the project)
+SELECT * FROM Attendance_Session;
