@@ -1,0 +1,6 @@
+.git
+.vscode
+*.venv
+requirements.txt
+*.ipynb
+.env

@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: attendance_db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - attendance_network
+
+  api:
+    build: .
+    container_name: attendance_api
+    depends_on:
+      - mysql
+    environment:
+      DB_HOST: mysql
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      SENDER_EMAIL: ${SENDER_EMAIL}
+      SENDER_PASSWORD: ${SENDER_PASSWORD}
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./student_photos:/app/student_photos
+    networks:
+      - attendance_network
+
+  scheduler:
+    build: .
+    container_name: attendance_scheduler
+    depends_on:
+      - mysql
+    command: python scheduler.py
+    environment:
+      DB_HOST: mysql
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      SENDER_EMAIL: ${SENDER_EMAIL}
+      SENDER_PASSWORD: ${SENDER_PASSWORD}
+      AUTO_NOTIFY_ENABLED: "true"
+      AUTO_NOTIFY_SCHEDULE: "18:00"
+    networks:
+      - attendance_network
+
+volumes:
+  mysql_data:
+
+networks:
+  attendance_network:
+    driver: bridge
